@@ -83,51 +83,28 @@ const cities = [
   { name: "那覇", lat: 26.2124, lon: 127.6809 },
 ];
 
-// Open-Meteo の weather code を日本語の説明とアイコンに変換
-function decodeWeatherCode(code) {
-  const table = {
-    0: ["快晴", "☀️"],
-    1: ["晴れ", "🌤️"],
-    2: ["一部曇り", "⛅"],
-    3: ["曇り", "☁️"],
-    45: ["霧", "🌫️"],
-    48: ["霧氷", "🌫️"],
-    51: ["小雨", "🌦️"],
-    53: ["雨", "🌦️"],
-    55: ["強い雨", "🌧️"],
-    56: ["着氷性の霧雨", "🌧️"],
-    57: ["着氷性の強い霧雨", "🌧️"],
-    61: ["小雨", "🌧️"],
-    63: ["雨", "🌧️"],
-    65: ["大雨", "🌧️"],
-    66: ["着氷性の雨", "🌧️"],
-    67: ["着氷性の強い雨", "🌧️"],
-    71: ["小雪", "🌨️"],
-    73: ["雪", "🌨️"],
-    75: ["大雪", "❄️"],
-    77: ["霧雪", "❄️"],
-    80: ["にわか雨", "🌦️"],
-    81: ["にわか雨", "🌧️"],
-    82: ["激しいにわか雨", "⛈️"],
-    85: ["にわか雪", "🌨️"],
-    86: ["激しいにわか雪", "❄️"],
-    95: ["雷雨", "⛈️"],
-    96: ["雷雨(ひょう)", "⛈️"],
-    99: ["激しい雷雨(ひょう)", "⛈️"],
-  };
-  return table[code] || ["不明", "❓"];
+// wttr.in の英語の天気説明を日本語の説明とアイコンに変換
+function decodeDesc(desc) {
+  const d = desc.toLowerCase();
+  if (d.includes("thunder")) return ["雷雨", "⛈️"];
+  if (d.includes("snow") || d.includes("sleet") || d.includes("ice")) return ["雪", "❄️"];
+  if (d.includes("rain") || d.includes("drizzle") || d.includes("shower")) return ["雨", "🌧️"];
+  if (d.includes("fog") || d.includes("mist") || d.includes("haze")) return ["霧", "🌫️"];
+  if (d.includes("overcast")) return ["曇り", "☁️"];
+  if (d.includes("cloud")) return ["一部曇り", "⛅"];
+  if (d.includes("sunny") || d.includes("clear")) return ["晴れ", "☀️"];
+  return [desc, "❓"];
 }
 
 async function fetchWeather(city) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo`;
+  const url = `https://wttr.in/${city.lat},${city.lon}?format=j1`;
   const res = await fetch(url);
   if (!res.ok) throw new Error("取得失敗: " + city.name);
   const data = await res.json();
-  const code = data.daily.weathercode[0];
-  const tmax = data.daily.temperature_2m_max[0];
-  const tmin = data.daily.temperature_2m_min[0];
-  const [desc, icon] = decodeWeatherCode(code);
-  return { name: city.name, desc, icon, tmax, tmin };
+  const current = data.current_condition[0];
+  const today = data.weather[0];
+  const [desc, icon] = decodeDesc(current.weatherDesc[0].value);
+  return { name: city.name, desc, icon, tmax: today.maxtempC, tmin: today.mintempC };
 }
 
 function renderCard(info) {
