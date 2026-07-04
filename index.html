@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今日の天気アプリ</title>
+<style>
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    background: linear-gradient(135deg, #74b9ff, #a29bfe);
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    color: #fff;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+  }
+  #date {
+    text-align: center;
+    color: #fff;
+    margin-bottom: 20px;
+  }
+  .cards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    width: 180px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  }
+  .card h2 {
+    margin: 0 0 10px;
+    font-size: 1.2em;
+    color: #333;
+  }
+  .icon {
+    font-size: 48px;
+    margin: 10px 0;
+  }
+  .temp {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: #d63031;
+  }
+  .temp-min {
+    color: #0984e3;
+  }
+  .desc {
+    color: #555;
+    margin-top: 6px;
+  }
+  .loading {
+    text-align: center;
+    color: #fff;
+    font-size: 1.2em;
+  }
+</style>
+</head>
+<body>
+  <h1>今日の天気</h1>
+  <div id="date"></div>
+  <div id="cards" class="cards">
+    <div class="loading">読み込み中...</div>
+  </div>
+
+<script>
+const cities = [
+  { name: "高松", lat: 34.3428, lon: 134.0466 },
+  { name: "東京", lat: 35.6895, lon: 139.6917 },
+  { name: "大阪", lat: 34.6937, lon: 135.5023 },
+  { name: "札幌", lat: 43.0621, lon: 141.3544 },
+  { name: "那覇", lat: 26.2124, lon: 127.6809 },
+];
+
+// Open-Meteo の weather code を日本語の説明とアイコンに変換
+function decodeWeatherCode(code) {
+  const table = {
+    0: ["快晴", "☀️"],
+    1: ["晴れ", "🌤️"],
+    2: ["一部曇り", "⛅"],
+    3: ["曇り", "☁️"],
+    45: ["霧", "🌫️"],
+    48: ["霧氷", "🌫️"],
+    51: ["小雨", "🌦️"],
+    53: ["雨", "🌦️"],
+    55: ["強い雨", "🌧️"],
+    56: ["着氷性の霧雨", "🌧️"],
+    57: ["着氷性の強い霧雨", "🌧️"],
+    61: ["小雨", "🌧️"],
+    63: ["雨", "🌧️"],
+    65: ["大雨", "🌧️"],
+    66: ["着氷性の雨", "🌧️"],
+    67: ["着氷性の強い雨", "🌧️"],
+    71: ["小雪", "🌨️"],
+    73: ["雪", "🌨️"],
+    75: ["大雪", "❄️"],
+    77: ["霧雪", "❄️"],
+    80: ["にわか雨", "🌦️"],
+    81: ["にわか雨", "🌧️"],
+    82: ["激しいにわか雨", "⛈️"],
+    85: ["にわか雪", "🌨️"],
+    86: ["激しいにわか雪", "❄️"],
+    95: ["雷雨", "⛈️"],
+    96: ["雷雨(ひょう)", "⛈️"],
+    99: ["激しい雷雨(ひょう)", "⛈️"],
+  };
+  return table[code] || ["不明", "❓"];
+}
+
+async function fetchWeather(city) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("取得失敗: " + city.name);
+  const data = await res.json();
+  const code = data.daily.weathercode[0];
+  const tmax = data.daily.temperature_2m_max[0];
+  const tmin = data.daily.temperature_2m_min[0];
+  const [desc, icon] = decodeWeatherCode(code);
+  return { name: city.name, desc, icon, tmax, tmin };
+}
+
+function renderCard(info) {
+  return `
+    <div class="card">
+      <h2>${info.name}</h2>
+      <div class="icon">${info.icon}</div>
+      <div class="desc">${info.desc}</div>
+      <div class="temp">${info.tmax}℃ <span class="temp-min">/ ${info.tmin}℃</span></div>
+    </div>
+  `;
+}
+
+function renderErrorCard(name) {
+  return `
+    <div class="card">
+      <h2>${name}</h2>
+      <div class="icon">⚠️</div>
+      <div class="desc">取得できませんでした</div>
+    </div>
+  `;
+}
+
+async function main() {
+  const today = new Date();
+  document.getElementById("date").textContent = today.toLocaleDateString("ja-JP", {
+    year: "numeric", month: "long", day: "numeric", weekday: "long"
+  });
+
+  const results = await Promise.allSettled(cities.map(fetchWeather));
+  const cardsHtml = results.map((r, i) => {
+    if (r.status === "fulfilled") return renderCard(r.value);
+    return renderErrorCard(cities[i].name);
+  }).join("");
+  document.getElementById("cards").innerHTML = cardsHtml;
+}
+
+main();
+</script>
+</body>
+</html>
